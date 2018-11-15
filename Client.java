@@ -1,6 +1,7 @@
 import java.net.*;
 import java.io.*;
 import java.util.*;
+import java.text.SimpleDateFormat;
 
 public class Client {
     // initialize socket and input output streams
@@ -142,7 +143,7 @@ public class Client {
         case "get":
             request += method.toUpperCase() + " RFC " + rfc + " P2P-CI/1.0\n";
             request += "Host: " + hostname + "\n";
-            request += "OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version");
+            request += "OS: " + OSInfo();
             break;
         }
         return request;
@@ -166,8 +167,32 @@ class UploadServer extends Thread {
                 // takes input from the client socket
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                
+
                 String request, response;
+
+                response = "P2P-CI/1.0 ";
+                request = in.readUTF();
+
+                LocalDateTime now = LocalDateTime.now();
+
+                // Check for Bad Request
+                if (!request.matches("GET RFC (\\d)* .*\\nHost: .*\\nOS: .*")) {
+                    response += "400 Bad Request\nDate: " + formatToGMT(new Date()) + "\nOS: " + OSInfo();
+                    out.writeUTF(response);
+                    continue;
+                }
+
+                // parse request in arrays
+                String[] lines = request.split("\n");
+                String[] line0 = lines[0].split(" ");
+
+                // Check if proper version
+                if (!line0[line0.length - 1].equals("P2P-CI/1.0")) {
+                    response += "505 P2P-CI Version Not Supported\nDate: " + formatToGMT(new Date()) + "\nOS: "
+                            + OSInfo();
+                    out.writeUTF(response);
+                    continue;
+                }
 
                 in.close();
                 out.close();
@@ -178,5 +203,16 @@ class UploadServer extends Thread {
                 e.printStackTrace();
             }
         }
+    }
+
+    public String formatToGMT(Date date) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+        SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss");
+        return format.format(new Date(sdf.format(date))) + " GMT";
+    }
+
+    public String OSInfo() {
+        return System.getProperty("os.name") + " " + System.getProperty("os.version");
     }
 }

@@ -104,8 +104,6 @@ class ClientHandler extends Thread {
                 response = "P2P-CI/1.0 ";
                 request = in.readUTF();
 
-                // System.out.println(request);
-
                 // Check for Bad Request
                 if (!request.matches("(ADD|LOOKUP) RFC (\\d)* .*\\nHost: .*\\nPort: (\\d)*\\nTitle: .*")
                         && !request.matches("LIST ALL .*\\nHost: .*\\nPort: (\\d)*")) {
