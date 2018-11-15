@@ -73,8 +73,24 @@ public class Client {
                 } else if (line.equalsIgnoreCase("GET")) {
                     System.out.print("Enter RFC number: ");
                     String rfc = input_terminal.readLine();
+                    System.out.print("Enter Peer Machine IP address: ");
+                    String peer_addr = input_terminal.readLine();
+                    System.out.print("Enter Peer Machine Port Number: ");
+                    int peer_port = Integer.parseInt(input_terminal.readLine());
+
                     String request = generateRequest("get", rfc, "");
-                    out.writeUTF(request);
+
+                    Socket peer_socket = new Socket(peer_addr, peer_port);
+                    System.out.println("\nConnected to Peer Upload Server\n");
+                    DataInputStream pin = new DataInputStream(peer_socket.getInputStream());
+                    DataOutputStream pout = new DataOutputStream(peer_socket.getOutputStream());
+
+                    pout.writeUTF(request);
+                    System.out.println(pin.readUTF());
+
+                    pin.close();
+                    pout.close();
+                    peer_socket.close();
                     //
                 } else {
                     System.out.println("Not a valid method. Please Try Again");
@@ -194,7 +210,7 @@ class UploadServer extends Thread {
 
                 String rfc = line0[2];
                 // Check if file exists
-                File f = new File("rfcs/" + rfc + ".txt");
+                File f = new File("rfcs/rfc" + rfc + ".txt");
                 if (!f.exists() || f.isDirectory()) {
                     response += "404 Not Found\nDate: " + formatToGMT(new Date()) + "\nOS: " + OSInfo();
                     out.writeUTF(response);
@@ -209,7 +225,7 @@ class UploadServer extends Thread {
                     response += temp + "\n";
                 } 
                 out.writeUTF(response);
-                
+
             } catch (Exception e) {
                 // close connection and output error
                 e.printStackTrace();
