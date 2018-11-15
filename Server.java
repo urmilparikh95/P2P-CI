@@ -26,7 +26,7 @@ class RFC {
     public RFC(String number, String title) {
         this.number = number;
         this.title = title;
-        peers = new ArrayList<>();
+        peers = Collections.synchronizedList(new ArrayList<>());
     }
 
     public String toString() {

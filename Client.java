@@ -38,7 +38,7 @@ public class Client {
         System.out.println(
                 "Hello!!\n" + "List of methods available:\n" + "1. ADD: add an RFC to the peer to peer network\n"
                         + "2. LOOKUP: find peers that have a specified RFC\n" + "3. LIST: list all RFCs available\n"
-                        + "4. GET: download an RFC\n" + "Type 'exit or 'Ctrl+C to terminate connection\n");
+                        + "4. GET: download an RFC\n" + "Type 'exit' or Ctrl+C to terminate connection\n");
 
         // keep reading until "Exit" is input
         while (true) {
@@ -54,8 +54,17 @@ public class Client {
                     String title = input_terminal.readLine();
                     String request = generateRequest("add", rfc, title);
                     out.writeUTF(request);
-                    System.out.println(in.readUTF());
-                    //
+
+                    String response = in.readUTF();
+                    String[] lines = response.split("\n");
+                    String[] line0 = lines[0].split(" ");
+                    if (line0[1].equalsIgnoreCase("200")) {
+                        System.out.println();
+                        System.out.println("Add file success");
+                    } else {
+                        System.out.println("\nAn error occured with code " + line0[1]);
+                        System.out.println("Add file failed");
+                    }
                 } else if (line.equalsIgnoreCase("LOOKUP")) {
                     System.out.print("Enter RFC number: ");
                     String rfc = input_terminal.readLine();
@@ -63,13 +72,47 @@ public class Client {
                     String title = input_terminal.readLine();
                     String request = generateRequest("lookup", rfc, title);
                     out.writeUTF(request);
-                    System.out.println(in.readUTF());
-                    //
+
+                    String response = in.readUTF();
+                    String[] lines = response.split("\n");
+                    String[] line0 = lines[0].split(" ");
+                    if (line0[1].equalsIgnoreCase("200")) {
+                        System.out.println();
+                        for (int i = 1; i < lines.length; i++) {
+                            line0 = lines[i].split(" ");
+                            System.out.println("RFC " + line0[1] + " - ");
+                            String h = line0[line0.length - 2];
+                            System.out.println("Hostname: " + h.substring(0, h.lastIndexOf("/")));
+                            System.out.println("IP Address: " + h.substring(h.lastIndexOf("/") + 1).split(":")[0]);
+                            System.out.println("Port No: " + line0[line0.length - 1]);
+                            System.out.println();
+                        }
+                    } else {
+                        System.out.println("\nAn error occured with code " + line0[1]);
+                        System.out.println("No RFC of the given number exists on the system");
+                    }
                 } else if (line.equalsIgnoreCase("LIST")) {
                     String request = generateRequest("list", "", "");
                     out.writeUTF(request);
-                    System.out.println(in.readUTF());
-                    //
+
+                    String response = in.readUTF();
+                    String[] lines = response.split("\n");
+                    String[] line0 = lines[0].split(" ");
+                    if (line0[1].equalsIgnoreCase("200")) {
+                        System.out.println();
+                        for (int i = 1; i < lines.length; i++) {
+                            line0 = lines[i].split(" ");
+                            System.out.println("RFC " + line0[1] + " - ");
+                            String h = line0[line0.length - 2];
+                            System.out.println("Hostname: " + h.substring(0, h.lastIndexOf("/")));
+                            System.out.println("IP Address: " + h.substring(h.lastIndexOf("/") + 1).split(":")[0]);
+                            System.out.println("Port No: " + line0[line0.length - 1]);
+                            System.out.println();
+                        }
+                    } else {
+                        System.out.println("\nAn error occured with code " + line0[1]);
+                        System.out.println("No RFC in the system");
+                    }
                 } else if (line.equalsIgnoreCase("GET")) {
                     System.out.print("Enter RFC number: ");
                     String rfc = input_terminal.readLine();
@@ -86,12 +129,13 @@ public class Client {
                     DataOutputStream pout = new DataOutputStream(peer_socket.getOutputStream());
 
                     pout.writeUTF(request);
-                    System.out.println(pin.readUTF());
+
+                    String response = in.readUTF();
+                    //
 
                     pin.close();
                     pout.close();
                     peer_socket.close();
-                    //
                 } else {
                     System.out.println("Not a valid method. Please Try Again");
                 }
