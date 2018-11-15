@@ -218,12 +218,14 @@ class UploadServer extends Thread {
                 }
 
                 // File found
-                response += "200 OK\nDate: " + formatToGMT(new Date()) + "\nOS: " + OSInfo() + "\nLast-Modified: " + formatToGMT(new Date(f.lastModified())) + "\nContent-Length: " + f.length() + "\nContent-Type: text/text\n";
-                BufferedReader br = new BufferedReader(new FileReader(f)); 
-                String temp; 
+                response += "200 OK\nDate: " + formatToGMT(new Date()) + "\nOS: " + OSInfo() + "\nLast-Modified: "
+                        + formatToGMT(new Date(f.lastModified())) + "\nContent-Length: " + f.length()
+                        + "\nContent-Type: text/text\n";
+                BufferedReader br = new BufferedReader(new FileReader(f));
+                String temp;
                 while ((temp = br.readLine()) != null) {
                     response += temp + "\n";
-                } 
+                }
                 out.writeUTF(response);
 
             } catch (Exception e) {

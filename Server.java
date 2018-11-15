@@ -12,6 +12,9 @@ class Peer {
         this.port = port;
     }
 
+    public String toString() {
+        return hostname;
+    }
 }
 
 class RFC {
@@ -24,6 +27,10 @@ class RFC {
         this.number = number;
         this.title = title;
         peers = new ArrayList<>();
+    }
+
+    public String toString() {
+        return peers.toString();
     }
 
 }
@@ -99,6 +106,8 @@ class ClientHandler extends Thread {
         hostname = socket.getRemoteSocketAddress().toString();
         String request, response;
         String upload_port, rfc, title, method;
+        int init = 0;
+        Peer host = null;
         while (true) {
             try {
                 response = "P2P-CI/1.0 ";
@@ -126,7 +135,11 @@ class ClientHandler extends Thread {
                 method = line0[0];
                 hostname = lines[1].substring(6) + socket.getRemoteSocketAddress().toString();
                 upload_port = lines[2].substring(6);
-                Peer host = addHost(hostname, upload_port);
+
+                if (init == 0) {
+                    host = addHost(hostname, upload_port);
+                    init++;
+                }
 
                 switch (method) {
                 case "ADD":
@@ -167,7 +180,7 @@ class ClientHandler extends Thread {
                 out.writeUTF(response);
             } catch (IOException e) {
                 // remove the client entries
-                removeHost(hostname);
+                removeHost(host);
                 System.out.println("Connection with " + hostname + " terminated");
                 break;
             }
@@ -184,22 +197,15 @@ class ClientHandler extends Thread {
         }
     }
 
-    public void removeHost(String hostname) {
-        Peer temp_peer = null;
-        for (Peer peer : Server.peers) {
-            if (peer.hostname == hostname) {
-                temp_peer = peer;
-                Server.peers.remove(temp_peer);
-                break;
-            }
-        }
+    public void removeHost(Peer host) {
         for (Integer i : Server.rfcs.keySet()) {
             RFC temp = Server.rfcs.get(i);
-            temp.peers.remove(temp_peer);
+            temp.peers.remove(host);
             if (temp.peers.size() == 0) {
                 Server.rfcs.remove(i);
             }
         }
+        Server.peers.remove(host);
     }
 
     public Peer addHost(String hostname, String port) {
