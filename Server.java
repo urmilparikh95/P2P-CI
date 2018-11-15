@@ -58,7 +58,6 @@ class ClientHandler extends Thread {
     final DataInputStream in;
     final DataOutputStream out;
     final Socket socket;
-    private String hostname;
 
     // Constructor
     public ClientHandler(Socket socket, DataInputStream in, DataOutputStream out) {
@@ -69,120 +68,106 @@ class ClientHandler extends Thread {
 
     @Override
     public void run() {
+        String request, response;
+        String hostname = "", upload_port, rfc, title, method;
         while (true) {
             try {
-                out.writeUTF(
-                        "Connected to Server..\n" + "Enter total number of RFCs you have (must be greater than 0)");
+                response = "P2P-CI/1.0 ";
+                request = in.readUTF();
 
-                hostname = socket.getRemoteSocketAddress().toString();
-                int count = Integer.parseInt(in.readUTF());
-
-                for (int i = 0; i < count; i++) {
-                    out.writeUTF("Enter RFC number for RFC " + i);
-                    int rfc_no = Integer.parseInt(in.readUTF());
-                    out.writeUTF("Enter RFC title for RFC " + i);
-                    String rfc_title = in.readUTF();
-                    if (Server.rfcs.containsKey(rfc_no)) {
-                        RFC temp = Server.rfcs.get(rfc_no);
-                        temp.addHost(hostname);
-                    } else {
-                        RFC temp = new RFC(rfc_no, rfc_title);
-                        temp.addHost(hostname);
-                        Server.rfcs.put(rfc_no, temp);
-                    }
+                // Check for Bad Request
+                if(!request.matches("(ADD|LOOKUP) RFC (\\d)* .*\\nHost: .*\\nPort: (\\d)*\\nTitle: .*") || !request.matches("LIST ALL .*\\nHost: .*\\nPort: (\\d)*") ){
+                    response += "400 Bad Request";
+                    out.writeUTF(response);
+                    continue;
                 }
 
-                out.writeUTF("Enter upload port");
-                int u_port = Integer.parseInt(in.readUTF());
-                Peer temp_peer = new Peer(hostname, u_port);
-                Server.peers.add(temp_peer);
+                // parse request in arrays
+                String[] lines = request.split("\n");
+                String[] line0 = lines[0].split(" ");
 
-                System.out.println("Client - " + hostname + " has been setup as a peer in the network");
+                // Check if proper version
+                if (line0[line0.length-1].equals("P2P-CI/1.0")){
+                    response+= "505 P2P-CI Version Not Supported";
+                    out.writeUTF(response);
+                    continue;
+                }
 
-                String received;
-                String toreturn;
+                method = line0[0];
+                hostname = lines[1].substring(6) + socket.getRemoteSocketAddress().toString();
+                upload_port = lines[2].substring(6);
+                addHost(hostname, upload_port);
 
-                out.writeUTF("Hello!!\n" + "Type an RFC number to get the list of peers containing it\n"
-                        + "Type 'list' to list the available RFCs\n" + "Type 'info' to list the commands available\n"
-                        + "Type 'exit' to leave\n");
-
-                // define flag to terminate server on exit
-                int flag = 0;
-                while (flag != 1) {
-                    received = in.readUTF();
-                    switch (received) {
-                    case "list":
-                        toreturn = "RFC numbers available are ";
-                        for (int i : Server.rfcs.keySet()) {
-                            toreturn += i + ", ";
-                        }
-                        out.writeUTF(toreturn.trim().substring(0, toreturn.length() - 1));
+                switch(method){
+                    case "ADD":
+                        rfc = line0[2];
+                        title = lines[2].substring(7);
+                        addRFC(rfc, title, hostname);
+                        response += "200 OK\nRFC " + rfc + " " + title + " " + upload_port;
                         break;
-                    case "info":
-                        out.writeUTF("Type an RFC number to get the list of peers containing it\n"
-                                + "Type 'list' to list the available RFCs\n"
-                                + "Type 'info' to list the commands available\n" + "Type 'exit' to leave\n");
-                        break;
-                    case "exit":
-                        out.writeUTF("Connection closed");
-                        // remove the client entries
-                        for(Peer peer : Server.peers){
-                            if(peer.hostname == hostname){
-                                Server.peers.remove(peer);
-                                break;
-                            }
-                        }
-                        for(Integer i : Server.rfcs.keySet()){
-                            Server.rfcs.get(i).removeHost(hostname);
-                        }
-                        this.socket.close();
-                        System.out.println("Connection with " + hostname + " closed");
-                        flag = 1;
-                        break;
-                    default:
-                        if(received.matches("^\\d+$")){
-                            int rfc_no = Integer.parseInt(received);
-                            if(Server.rfcs.keySet().contains(rfc_no)){
-                                toreturn = "Peers containing RFC " + rfc_no +  " are ";
-                                for (String host : Server.rfcs.get(rfc_no).hosts) {
-                                    toreturn += host + ", ";
+                    case "LOOKUP":
+                        rfc = line0[2];
+                        title = lines[2].substring(7);
+                        if(Server.rfcs.containsKey(Integer.parseInt(rfc))){
+                            response += "200 OK\n";
+                            for(Integer i : Server.rfcs.keySet()){
+                                RFC temp = Server.rfcs.get(i);
+                                for(String h : temp.hosts) {
+
                                 }
-                                toreturn = toreturn.trim().substring(0, toreturn.length() - 1);
-                            } else {
-                                toreturn = "No Peer contains that RFC";
                             }
-                            out.writeUTF(toreturn);
                         } else {
-                            out.writeUTF("Command not Supported");
+                            response += "404 Not Found";
                         }
-                    }
-                }
-
-            } catch (IOException e) {
-                // e.printStackTrace();
-                // remove the client entries
-                for(Peer peer : Server.peers){
-                    if(peer.hostname == hostname){
-                        Server.peers.remove(peer);
                         break;
-                    }
                 }
-                for(Integer i : Server.rfcs.keySet()){
-                    Server.rfcs.get(i).removeHost(hostname);
-                }
-                this.socket.close();
-                System.out.println("Connection with " + hostname + " closed");
+                out.writeUTF(response);
+            } catch (IOException e) {
+                // remove the client entries
+                removeHost(hostname);
+                System.out.println("Connection with " + hostname + " terminated");
                 break;
             }
         }
 
         try {
             // closing resources
+            this.socket.close();
             this.in.close();
             this.out.close();
 
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void removeHost(String hostname) {
+        for (Peer peer : Server.peers) {
+            if (peer.hostname == hostname) {
+                Server.peers.remove(peer);
+                break;
+            }
+        }
+        for (Integer i : Server.rfcs.keySet()) {
+            RFC temp = Server.rfcs.get(i);
+            temp.removeHost(hostname);
+            if (temp.hosts.size() == 0) {
+                Server.rfcs.remove(i);
+            }
+        }
+    }
+
+    public void addHost(String hostname, String port) {
+        Server.peers.add(new Peer(hostname,port));
+    }
+
+    public void addRFC(String rfc, String title, String hostname) {
+        if(Server.rfcs.containsKey(Integer.parseInt(rfc))){
+            Server.rfcs.addHost(hostname);
+        } else {
+            RFC temp = new RFC(rfc, title);
+            temp.addHost(hostname);
+            Server.rfcs.put(Integer.parseInt(rfc), temp);
         }
     }
 }
