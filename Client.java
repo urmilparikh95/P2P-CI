@@ -143,7 +143,7 @@ public class Client {
         case "get":
             request += method.toUpperCase() + " RFC " + rfc + " P2P-CI/1.0\n";
             request += "Host: " + hostname + "\n";
-            request += "OS: " + OSInfo();
+            request += "OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version");
             break;
         }
         return request;
@@ -173,8 +173,6 @@ class UploadServer extends Thread {
                 response = "P2P-CI/1.0 ";
                 request = in.readUTF();
 
-                LocalDateTime now = LocalDateTime.now();
-
                 // Check for Bad Request
                 if (!request.matches("GET RFC (\\d)* .*\\nHost: .*\\nOS: .*")) {
                     response += "400 Bad Request\nDate: " + formatToGMT(new Date()) + "\nOS: " + OSInfo();
@@ -194,12 +192,26 @@ class UploadServer extends Thread {
                     continue;
                 }
 
-                in.close();
-                out.close();
+                String rfc = line0[2];
+                // Check if file exists
+                File f = new File("rfcs/" + rfc + ".txt");
+                if (!f.exists() || f.isDirectory()) {
+                    response += "404 Not Found\nDate: " + formatToGMT(new Date()) + "\nOS: " + OSInfo();
+                    out.writeUTF(response);
+                    continue;
+                }
 
+                // File found
+                response += "200 OK\nDate: " + formatToGMT(new Date()) + "\nOS: " + OSInfo() + "\nLast-Modified: " + formatToGMT(new Date(f.lastModified())) + "\nContent-Length: " + f.length() + "\nContent-Type: text/text\n";
+                BufferedReader br = new BufferedReader(new FileReader(f)); 
+                String temp; 
+                while ((temp = br.readLine()) != null) {
+                    response += temp + "\n";
+                } 
+                out.writeUTF(response);
+                
             } catch (Exception e) {
                 // close connection and output error
-                socket.close();
                 e.printStackTrace();
             }
         }
