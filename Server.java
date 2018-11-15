@@ -2,6 +2,32 @@ import java.net.*;
 import java.io.*;
 import java.util.*;
 
+class Peer {
+
+    public String hostname;
+    public String port;
+
+    public Peer(String hostname, String port) {
+        this.hostname = hostname;
+        this.port = port;
+    }
+
+}
+
+class RFC {
+
+    public String number;
+    public String title;
+    public List<Peer> peers;
+
+    public RFC(String number, String title) {
+        this.number = number;
+        this.title = title;
+        peers = new ArrayList<>();
+    }
+
+}
+
 public class Server {
     // initialize socket and input stream
     private Socket socket = null;
@@ -59,6 +85,8 @@ class ClientHandler extends Thread {
     final DataOutputStream out;
     final Socket socket;
 
+    private String hostname;
+
     // Constructor
     public ClientHandler(Socket socket, DataInputStream in, DataOutputStream out) {
         this.socket = socket;
@@ -68,15 +96,19 @@ class ClientHandler extends Thread {
 
     @Override
     public void run() {
+        hostname = socket.getRemoteSocketAddress().toString();
         String request, response;
-        String hostname = "", upload_port, rfc, title, method;
+        String upload_port, rfc, title, method;
         while (true) {
             try {
                 response = "P2P-CI/1.0 ";
                 request = in.readUTF();
 
+                // System.out.println(request);
+
                 // Check for Bad Request
-                if(!request.matches("(ADD|LOOKUP) RFC (\\d)* .*\\nHost: .*\\nPort: (\\d)*\\nTitle: .*") || !request.matches("LIST ALL .*\\nHost: .*\\nPort: (\\d)*") ){
+                if (!request.matches("(ADD|LOOKUP) RFC (\\d)* .*\\nHost: .*\\nPort: (\\d)*\\nTitle: .*")
+                        && !request.matches("LIST ALL .*\\nHost: .*\\nPort: (\\d)*")) {
                     response += "400 Bad Request";
                     out.writeUTF(response);
                     continue;
@@ -87,8 +119,8 @@ class ClientHandler extends Thread {
                 String[] line0 = lines[0].split(" ");
 
                 // Check if proper version
-                if (line0[line0.length-1].equals("P2P-CI/1.0")){
-                    response+= "505 P2P-CI Version Not Supported";
+                if (!line0[line0.length - 1].equals("P2P-CI/1.0")) {
+                    response += "505 P2P-CI Version Not Supported";
                     out.writeUTF(response);
                     continue;
                 }
@@ -96,30 +128,43 @@ class ClientHandler extends Thread {
                 method = line0[0];
                 hostname = lines[1].substring(6) + socket.getRemoteSocketAddress().toString();
                 upload_port = lines[2].substring(6);
-                addHost(hostname, upload_port);
+                Peer host = addHost(hostname, upload_port);
 
-                switch(method){
-                    case "ADD":
-                        rfc = line0[2];
-                        title = lines[2].substring(7);
-                        addRFC(rfc, title, hostname);
-                        response += "200 OK\nRFC " + rfc + " " + title + " " + upload_port;
-                        break;
-                    case "LOOKUP":
-                        rfc = line0[2];
-                        title = lines[2].substring(7);
-                        if(Server.rfcs.containsKey(Integer.parseInt(rfc))){
-                            response += "200 OK\n";
-                            for(Integer i : Server.rfcs.keySet()){
-                                RFC temp = Server.rfcs.get(i);
-                                for(String h : temp.hosts) {
-
-                                }
-                            }
-                        } else {
-                            response += "404 Not Found";
+                switch (method) {
+                case "ADD":
+                    rfc = line0[2];
+                    title = lines[3].substring(7);
+                    addRFC(rfc, title, host);
+                    response += "200 OK\nRFC " + rfc + " " + title + " " + hostname + " " + upload_port;
+                    break;
+                case "LOOKUP":
+                    rfc = line0[2];
+                    title = lines[3].substring(7);
+                    if (Server.rfcs.containsKey(Integer.parseInt(rfc))) {
+                        response += "200 OK\n";
+                        RFC temp = Server.rfcs.get(Integer.parseInt(rfc));
+                        for (Peer p : temp.peers) {
+                            response += "RFC " + temp.number + " " + temp.title + " " + p.hostname + " " + p.port
+                                    + "\n";
                         }
-                        break;
+                    } else {
+                        response += "404 Not Found";
+                    }
+                    break;
+                case "LIST":
+                    if (Server.rfcs.size() > 0) {
+                        response += "200 OK\n";
+                        for (Integer i : Server.rfcs.keySet()) {
+                            RFC temp = Server.rfcs.get(i);
+                            for (Peer p : temp.peers) {
+                                response += "RFC " + temp.number + " " + temp.title + " " + p.hostname + " " + p.port
+                                        + "\n";
+                            }
+                        }
+                    } else {
+                        response += "404 Not Found";
+                    }
+                    break;
                 }
                 out.writeUTF(response);
             } catch (IOException e) {
@@ -142,31 +187,36 @@ class ClientHandler extends Thread {
     }
 
     public void removeHost(String hostname) {
+        Peer temp_peer = null;
         for (Peer peer : Server.peers) {
             if (peer.hostname == hostname) {
-                Server.peers.remove(peer);
+                temp_peer = peer;
+                Server.peers.remove(temp_peer);
                 break;
             }
         }
         for (Integer i : Server.rfcs.keySet()) {
             RFC temp = Server.rfcs.get(i);
-            temp.removeHost(hostname);
-            if (temp.hosts.size() == 0) {
+            temp.peers.remove(temp_peer);
+            if (temp.peers.size() == 0) {
                 Server.rfcs.remove(i);
             }
         }
     }
 
-    public void addHost(String hostname, String port) {
-        Server.peers.add(new Peer(hostname,port));
+    public Peer addHost(String hostname, String port) {
+        Peer host = new Peer(hostname, port);
+        Server.peers.add(host);
+        return host;
     }
 
-    public void addRFC(String rfc, String title, String hostname) {
-        if(Server.rfcs.containsKey(Integer.parseInt(rfc))){
-            Server.rfcs.addHost(hostname);
+    public void addRFC(String rfc, String title, Peer host) {
+        if (Server.rfcs.containsKey(Integer.parseInt(rfc))) {
+            RFC temp = Server.rfcs.get(Integer.parseInt(rfc));
+            temp.peers.add(host);
         } else {
             RFC temp = new RFC(rfc, title);
-            temp.addHost(hostname);
+            temp.peers.add(host);
             Server.rfcs.put(Integer.parseInt(rfc), temp);
         }
     }

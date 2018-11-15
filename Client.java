@@ -53,7 +53,8 @@ public class Client {
                     String title = input_terminal.readLine();
                     String request = generateRequest("add", rfc, title);
                     out.writeUTF(request);
-                    // String response = in.readUTF();
+                    System.out.println(in.readUTF());
+                    //
                 } else if (line.equalsIgnoreCase("LOOKUP")) {
                     System.out.print("Enter RFC number: ");
                     String rfc = input_terminal.readLine();
@@ -61,10 +62,12 @@ public class Client {
                     String title = input_terminal.readLine();
                     String request = generateRequest("lookup", rfc, title);
                     out.writeUTF(request);
+                    System.out.println(in.readUTF());
                     //
                 } else if (line.equalsIgnoreCase("LIST")) {
                     String request = generateRequest("list", "", "");
                     out.writeUTF(request);
+                    System.out.println(in.readUTF());
                     //
                 } else if (line.equalsIgnoreCase("GET")) {
                     System.out.print("Enter RFC number: ");
@@ -120,7 +123,7 @@ public class Client {
         case "list":
             request += method.toUpperCase() + " ALL P2P-CI/1.0\n";
             request += "Host: " + hostname + "\n";
-            request += "Port: " + upload_port + "\n";
+            request += "Port: " + upload_port;
             break;
         case "get":
             request += method.toUpperCase() + " RFC " + rfc + " P2P-CI/1.0\n";
