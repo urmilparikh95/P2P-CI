@@ -16,7 +16,7 @@ public class Client {
         // establish a connection
         try {
             socket = new Socket(server_address, server_port);
-            System.out.println("Connected to Server\n");
+            System.out.println("Connected to CI Server\n");
 
             // takes input from terminal
             input_terminal = new DataInputStream(System.in);
@@ -105,8 +105,22 @@ public class Client {
         Scanner sc = new Scanner(System.in);
         System.out.print("Please Enter Hostname: ");
         hostname = sc.next();
-        System.out.print("Please Enter Client Upload Port Number: ");
-        upload_port = sc.nextInt();
+        ServerSocket upload_server;
+        int flag = 0;
+        while (flag == 0) {
+            try {
+                System.out.print("Please Enter Client Upload Port Number: ");
+                upload_port = sc.nextInt();
+                upload_server = new ServerSocket(upload_port);
+                System.out.println("Upload Server started at Port " + upload_port);
+                flag = 1;
+                // assign new thread to upload server
+                Thread handler = new UploadServer(upload_server);
+                handler.start();
+            } catch (IOException e) {
+                System.out.println("Port in use");
+            }
+        }
         new Client(server_addr, server_port);
     }
 
@@ -132,5 +146,37 @@ public class Client {
             break;
         }
         return request;
+    }
+}
+
+class UploadServer extends Thread {
+    final ServerSocket upload_server;
+
+    public UploadServer(ServerSocket upload_server) {
+        this.upload_server = upload_server;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                Socket socket = upload_server.accept();
+                System.out.println("\nNew Request from Peer at ip " + socket.getRemoteSocketAddress().toString());
+
+                // takes input from the client socket
+                DataInputStream in = new DataInputStream(socket.getInputStream());
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                
+                String request, response;
+
+                in.close();
+                out.close();
+
+            } catch (Exception e) {
+                // close connection and output error
+                socket.close();
+                e.printStackTrace();
+            }
+        }
     }
 }
