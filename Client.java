@@ -130,8 +130,24 @@ public class Client {
 
                     pout.writeUTF(request);
 
-                    String response = in.readUTF();
-                    //
+                    String response = pin.readUTF();
+                    String[] lines = response.split("\n");
+                    String[] line0 = lines[0].split(" ");
+                    if (line0[1].equalsIgnoreCase("200")) {
+                        System.out.println();
+                        BufferedWriter writer = new BufferedWriter(new FileWriter("rfcs/rfc" + rfc + ".txt"));
+                        for (int i = 6; i < lines.length; i++) {
+                            writer.write(lines[i]);
+                            writer.newLine();
+                        }
+                        writer.close();
+                        System.out.println("File transfer success");
+                        out.writeUTF(generateRequest("add", rfc, ""));
+                        in.readUTF();
+                    } else {
+                        System.out.println("\nAn error occured with code " + line0[1]);
+                        System.out.println("RFC not found in the peer's machine");
+                    }
 
                     pin.close();
                     pout.close();
@@ -271,7 +287,7 @@ class UploadServer extends Thread {
                     response += temp + "\n";
                 }
                 out.writeUTF(response);
-
+                
             } catch (Exception e) {
                 // close connection and output error
                 e.printStackTrace();
